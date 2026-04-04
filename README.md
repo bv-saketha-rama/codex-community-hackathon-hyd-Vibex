@@ -40,6 +40,9 @@ Vibex provides:
 8. When the user confirms, Vibex generates a file patch, commits it to GitHub, and watches deployment state.
 9. Status changes are surfaced in-app with lightweight notifications.
 
+## Demo URL
+https://drive.google.com/drive/folders/15sgglhfzDkYlsflCY7PD41GSMxXl5Jvp?usp=sharing
+
 ## AI Model Path
 
 Vibex currently uses OpenAI end to end for the user-facing AI flow:
