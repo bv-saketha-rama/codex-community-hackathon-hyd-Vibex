@@ -1,0 +1,31 @@
+.DS_Store
+.env
+.env.local
+.env.*.local
+.turbo
+coverage
+dist
+node_modules
+pnpm-debug.log
+
+# Expo
+front-end/.expo
+front-end/.expo-shared
+front-end/dist
+front-end/web-build
+
+# Native
+front-end/android
+front-end/ios
+
+# Convex
+backend/.convex
+
+# Build output
+backend/build
+backend/coverage
+
+# OS / editor
+.idea
+.vscode
+Thumbs.db
