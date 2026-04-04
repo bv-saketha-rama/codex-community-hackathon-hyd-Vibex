@@ -43,13 +43,74 @@ export interface ConversationSpec {
   designNotes: string[];
 }
 
+export interface ConversationReply {
+  reply: string;
+  readyToConfirm: boolean;
+  spec: ConversationSpec;
+  followUpCount: number;
+}
+
+export interface RepoFile {
+  path: string;
+  content: string;
+  sha?: string;
+  size: number;
+}
+
+export interface RepoSnapshot {
+  repo: string;
+  branch: string;
+  headSha: string;
+  defaultBranch?: string;
+  files: RepoFile[];
+  dependencies: string[];
+  repoSummary: string;
+}
+
+export interface RepoPatchFile {
+  path: string;
+  content: string;
+  operation: "upsert" | "delete";
+  reason: string;
+}
+
+export interface RepoPatch {
+  commitMessage: string;
+  summary: string;
+  files: RepoPatchFile[];
+}
+
+export interface RepoContextRecord {
+  repoSnapshot: RepoSnapshot;
+  skillPrompt: string;
+}
+
+export interface DeviceModelStatus {
+  modelId: string;
+  version: string;
+  state: "idle" | "downloading" | "ready" | "failed";
+  bytesDownloaded: number;
+  totalBytes: number;
+  percentage: number;
+  localUri?: string;
+  error?: string;
+}
+
+export interface HfSession {
+  accessToken: string;
+  scope: string;
+  expiresAt?: number;
+  userCode?: string;
+  handle?: string;
+  avatarUrl?: string;
+}
+
 export interface SessionUser {
   userId: string;
   githubToken: string;
   login: string;
   avatarUrl?: string;
   name?: string;
-  openaiApiKey?: string;
 }
 
 export interface RepoSelection {

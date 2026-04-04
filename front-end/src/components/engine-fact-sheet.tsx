@@ -8,16 +8,16 @@ interface EngineFactSheetProps {
 
 const FACTS = [
   {
-    label: "Voice",
-    value: "gpt-4o-mini-transcribe turns audio into text before Vibex thinks."
+    label: "Model",
+    value: "A gated Gemma mobile artifact is downloaded onto the Android device and prepared locally."
   },
   {
     label: "Plan",
-    value: "gpt-5.4 asks short follow-ups, builds the spec, and stops after 3 turns."
+    value: "Repo context is fetched from the backend, then clarification and patch generation happen on-device."
   },
   {
     label: "Code",
-    value: "gpt-5.4 generates the patch, then Vibex commits to GitHub and watches deploys."
+    value: "Vibex pushes the locally generated patch to GitHub and keeps Convex job state in sync."
   }
 ];
 
@@ -25,7 +25,7 @@ export function EngineFactSheet({ compact = false }: EngineFactSheetProps) {
   return (
     <View style={[styles.container, compact ? styles.compactContainer : undefined]}>
       <Text style={styles.eyebrow}>Backend model path</Text>
-      <Text style={styles.title}>What Vibex runs for you</Text>
+      <Text style={styles.title}>What Vibex runs on your phone</Text>
       {FACTS.map((fact) => (
         <View key={fact.label} style={styles.row}>
           <Text style={styles.label}>{fact.label}</Text>

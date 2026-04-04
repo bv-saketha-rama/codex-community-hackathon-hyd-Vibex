@@ -25,10 +25,16 @@ import { StudioShell } from "@/components/studio-shell";
 import {
   captureReferenceUrl,
   confirmConversation,
+  fetchRepoContext,
   fetchConversation,
   fetchProject,
-  sendConversation
+  saveConversationResult
 } from "@/lib/api";
+import {
+  generateOnDeviceConversation,
+  generateOnDevicePatch,
+  transcribeOnDeviceAudio
+} from "@/lib/device-model";
 import { api } from "@/lib/convex-api";
 import { pickImageBase64, readUrlFromClipboard, startRecording, stopRecording } from "@/lib/media";
 import { useAppStore } from "@/store/app-store";
@@ -66,7 +72,7 @@ export default function ConversationScreen() {
   const setLoading = useAppStore((state) => state.setLoading);
   const isSubmitting = useAppStore((state) => state.isSubmitting);
   const setLatestReferenceImage = useAppStore((state) => state.setLatestReferenceImage);
-  const latestReferenceImage = useAppStore((state) => state.latestReferenceImage);
+  const deviceModelStatus = useAppStore((state) => state.deviceModelStatus);
   const recordingRef = useRef<Awaited<ReturnType<typeof startRecording>> | null>(null);
   const recordingPrepareRef = useRef(false);
   const stopRequestedRef = useRef(false);
@@ -139,6 +145,14 @@ export default function ConversationScreen() {
       return;
     }
 
+    if (deviceModelStatus?.state !== "ready") {
+      Alert.alert(
+        "On-device model required",
+        "Open workspace settings, connect Hugging Face, and prepare the Android model before sending a request."
+      );
+      return;
+    }
+
     const nextInput = options?.inputOverride ?? draft.trim();
     const attachments = options?.attachmentsOverride ?? draftAttachments;
     if (!nextInput && !options?.audioBase64 && !options?.imageBase64) {
@@ -176,28 +190,62 @@ export default function ConversationScreen() {
       const screenshotBase64 = urlAttachment
         ? (await captureReferenceUrl(urlAttachment.value)).image_base64
         : options?.imageBase64 || imageAttachment?.value;
+      const effectiveInput = options?.audioBase64
+        ? await transcribeOnDeviceAudio(options.audioBase64)
+        : nextInput || "Voice request";
 
       if (screenshotBase64) {
         setLatestReferenceImage(screenshotBase64);
       }
 
-      const response = await sendConversation({
+      const repoContext = await fetchRepoContext({
         userId: session.userId,
         projectId,
-        conversationId,
         messages: conversation.messages,
-        attachments,
-        input: nextInput || "Voice request",
-        audio_base64: options?.audioBase64,
-        image_base64: screenshotBase64,
         repo: project.repoFullName,
         branch: project.branch,
         token: session.githubToken,
-        openai_api_key: session.openaiApiKey?.trim() || undefined
+        skills: []
+      });
+      const response = await generateOnDeviceConversation({
+        input: effectiveInput,
+        messages: conversation.messages,
+        followUpCount,
+        repoSnapshot: repoContext.repoSnapshot,
+        skillPrompt: repoContext.skillPrompt
+      });
+
+      const userMessage = {
+        role: "user" as const,
+        content: effectiveInput,
+        inputType,
+        attachments,
+        createdAt: new Date().toISOString()
+      };
+      const assistantMessage = {
+        role: "assistant" as const,
+        content: response.reply,
+        inputType: "text" as const,
+        attachments: screenshotBase64
+          ? [
+              {
+                kind: "image" as const,
+                label: "Local reference image",
+                value: screenshotBase64
+              }
+            ]
+          : [],
+        createdAt: new Date().toISOString()
+      };
+
+      await saveConversationResult({
+        conversationId,
+        messages: [...conversation.messages, userMessage, assistantMessage],
+        spec: response.spec
       });
 
       setSpec(response.spec);
-      setReadyToConfirm(response.ready_to_confirm);
+      setReadyToConfirm(response.readyToConfirm);
       setFollowUpCount(response.followUpCount);
       await refreshConversation();
     } finally {
@@ -291,18 +339,38 @@ export default function ConversationScreen() {
       return;
     }
 
+    if (deviceModelStatus?.state !== "ready") {
+      Alert.alert(
+        "On-device model required",
+        "Prepare the Android model locally before generating a patch."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
+      const repoContext = await fetchRepoContext({
+        userId: session.userId,
+        projectId,
+        messages: conversation?.messages || [],
+        repo: project.repoFullName,
+        branch: project.branch,
+        token: session.githubToken,
+        skills: []
+      });
+      const patch = await generateOnDevicePatch({
+        spec,
+        repoSnapshot: repoContext.repoSnapshot,
+        skillPrompt: repoContext.skillPrompt
+      });
       const response = await confirmConversation({
         userId: session.userId,
         projectId,
         conversationId,
-        spec,
         repo: project.repoFullName,
         branch: project.branch,
         token: session.githubToken,
-        openai_api_key: session.openaiApiKey?.trim() || undefined,
-        image_base64: latestReferenceImage
+        patch
       });
 
       setJob(
@@ -310,7 +378,7 @@ export default function ConversationScreen() {
           projectId,
           conversationId,
           status: "queued",
-          message: "Change queued for generation."
+          message: "Local patch queued for GitHub push."
         },
         response.jobId
       );
@@ -388,7 +456,7 @@ export default function ConversationScreen() {
             multiline
             numberOfLines={4}
             style={styles.input}
-            placeholder="Describe the change..."
+            placeholder="Describe the change to run locally on this device..."
             placeholderTextColor={colors.muted}
             value={draft}
             onChangeText={setDraft}
@@ -417,7 +485,10 @@ export default function ConversationScreen() {
             </Pressable>
             <Pressable
               onPress={() => void submitConversation()}
-              style={[styles.sendControl, isSubmitting ? styles.disabled : undefined]}
+              style={[
+                styles.sendControl,
+                isSubmitting || deviceModelStatus?.state !== "ready" ? styles.disabled : undefined
+              ]}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#050816" />
@@ -428,7 +499,7 @@ export default function ConversationScreen() {
           </View>
 
           {readyToConfirm ? (
-            <ActionButton label="Generate code and ship" onPress={handleConfirm} />
+            <ActionButton label="Generate local patch and ship" onPress={handleConfirm} />
           ) : null}
         </View>
       </View>

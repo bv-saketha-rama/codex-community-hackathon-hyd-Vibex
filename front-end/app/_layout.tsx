@@ -13,6 +13,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { LoadingScreen } from "@/components/loading-screen";
 import { NotificationStack } from "@/components/notification-stack";
+import { getDeviceModelStatus, startDeviceModelDownload } from "@/lib/device-model";
 import { useAppStore } from "@/store/app-store";
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -36,6 +37,8 @@ function AppNavigator() {
 export default function RootLayout() {
   const hydrate = useAppStore((state) => state.hydrate);
   const hydrated = useAppStore((state) => state.hydrated);
+  const hfSession = useAppStore((state) => state.hfSession);
+  const setDeviceModelStatus = useAppStore((state) => state.setDeviceModelStatus);
   const [fontsLoaded] = useFonts({
     DMSans: DMSans_400Regular,
     DMSansMedium: DMSans_500Medium,
@@ -46,6 +49,33 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    void (async () => {
+      const status = await getDeviceModelStatus();
+      setDeviceModelStatus(status);
+
+      if (hfSession?.accessToken && status.state === "idle") {
+        try {
+          const prepared = await startDeviceModelDownload({
+            accessToken: hfSession.accessToken,
+            onProgress: setDeviceModelStatus
+          });
+          setDeviceModelStatus(prepared);
+        } catch (error) {
+          setDeviceModelStatus({
+            ...status,
+            state: "failed",
+            error: error instanceof Error ? error.message : "Unable to prepare the local model."
+          });
+        }
+      }
+    })();
+  }, [hydrated, hfSession?.accessToken, setDeviceModelStatus]);
 
   if (!fontsLoaded || !hydrated) {
     return <LoadingScreen />;

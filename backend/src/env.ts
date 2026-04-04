@@ -18,9 +18,6 @@ const envSchema = z.object({
   CONVEX_DEPLOYMENT: optionalString(),
   CONVEX_URL: optionalUrl(),
   CONTEXT7_API_KEY: optionalString(),
-  OPENAI_API_KEY: optionalString(),
-  OPENAI_MODEL: z.string().default("gpt-5.4"),
-  OPENAI_TRANSCRIPTION_MODEL: z.string().default("gpt-4o-mini-transcribe"),
   PORT: z.coerce.number().default(8787),
   SMITHERY_REGISTRY_URL: z
     .string()

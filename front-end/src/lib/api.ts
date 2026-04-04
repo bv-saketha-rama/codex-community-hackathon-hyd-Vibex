@@ -2,9 +2,10 @@ import { Platform } from "react-native";
 
 import type {
   AgentDocRecord,
-  Attachment,
   ConversationMessage,
   ConversationRecord,
+  RepoContextRecord,
+  RepoPatch,
   ConversationSpec,
   MarketplaceSkill,
   McpServerRecord,
@@ -268,27 +269,28 @@ export async function captureReferenceUrl(url: string) {
   });
 }
 
-export async function sendConversation(payload: {
+export async function fetchRepoContext(payload: {
   userId?: string;
   projectId?: string;
-  conversationId?: string;
   messages: ConversationMessage[];
-  attachments?: Attachment[];
-  input: string;
-  audio_base64?: string;
-  image_base64?: string;
   repo: string;
   branch: string;
   token: string;
-  openai_api_key?: string;
   skills?: string[];
 }) {
-  return request<{
-    reply: string;
-    ready_to_confirm: boolean;
-    spec: ConversationSpec;
-    followUpCount: number;
-  }>("/conversation", {
+  return request<RepoContextRecord>("/repo-context", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function saveConversationResult(payload: {
+  conversationId?: string;
+  messages: ConversationMessage[];
+  spec: ConversationSpec;
+  title?: string;
+}) {
+  return request<{ conversation: ConversationRecord | null }>("/conversation", {
     method: "POST",
     body: JSON.stringify(payload)
   });
@@ -299,12 +301,10 @@ export async function confirmConversation(payload: {
   projectId?: string;
   conversationId?: string;
   jobId?: string;
-  spec: ConversationSpec;
   repo: string;
   branch: string;
   token: string;
-  openai_api_key?: string;
-  image_base64?: string;
+  patch: RepoPatch;
 }) {
   return request<{ jobId: string; commitSha?: string }>("/confirm", {
     method: "POST",
