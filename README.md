@@ -68,7 +68,7 @@ EXPO_PUBLIC_WEB_API_URL=http://localhost:8787
 EXPO_PUBLIC_AUTH_URL=https://your-convex-site.convex.site
 EXPO_PUBLIC_CONVEX_URL=https://your-convex-deployment.convex.cloud
 EXPO_PUBLIC_APP_SCHEME=vibex
-EXPO_PUBLIC_HF_OAUTH_CLIENT_ID=
+EXPO_PUBLIC_HF_OAUTH_CLIENT_ID=https://your-convex-site.convex.site/.well-known/oauth-cimd
 EXPO_PUBLIC_GEMMA_MODEL_ID=gemma-4-e4b-it-android
 EXPO_PUBLIC_GEMMA_MODEL_VERSION=dev-preview
 EXPO_PUBLIC_GEMMA_MODEL_FILE=gemma-4-e4b-it.task
@@ -137,6 +137,8 @@ Use the helper docs in [tools/gemma-task/README.md](./tools/gemma-task/README.md
 2. convert it into LiteRT assets and a `.task` bundle
 3. publish the bundle and manifest to a gated Hugging Face repo
 4. copy the published values into `front-end/.env.local`
+
+For Hugging Face device-code auth, Vibex can use the Convex-hosted OAuth metadata URL as the public client ID, so you do not need to manually create an OAuth app if your Convex site is reachable.
 
 ## Notes
 

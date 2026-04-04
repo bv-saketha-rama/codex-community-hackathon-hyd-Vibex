@@ -64,6 +64,75 @@ function redirectWithParams(redirectUri: string, params: Record<string, string>)
   return Response.redirect(url.toString(), 302);
 }
 
+function htmlPage(title: string, body: string) {
+  return new Response(
+    `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #04070c;
+        color: #f3f7ff;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top, rgba(79, 172, 255, 0.22), transparent 36%),
+          linear-gradient(180deg, #06101c 0%, #04070c 100%);
+      }
+
+      main {
+        width: min(560px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        padding: 28px;
+        background: rgba(6, 16, 28, 0.88);
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 28px;
+      }
+
+      p {
+        margin: 0;
+        line-height: 1.6;
+        color: rgba(243, 247, 255, 0.82);
+      }
+
+      code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        color: #9ed0ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${title}</h1>
+      <p>${body}</p>
+    </main>
+  </body>
+</html>`,
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8"
+      }
+    }
+  );
+}
+
 async function exchangeGitHubCode(code: string, redirectUri: string) {
   const response = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
@@ -158,6 +227,43 @@ http.route({
         "Content-Type": "text/plain"
       }
     });
+  })
+});
+
+http.route({
+  path: "/.well-known/oauth-cimd",
+  method: "GET",
+  handler: httpAction(async (_ctx, request) => {
+    const url = new URL(request.url);
+    const clientId = `${url.origin}/.well-known/oauth-cimd`;
+
+    return new Response(
+      JSON.stringify({
+        client_id: clientId,
+        client_name: "Vibex",
+        redirect_uris: [`${url.origin}/auth/huggingface/callback`],
+        token_endpoint_auth_method: "none",
+        client_uri: url.origin
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300"
+        }
+      }
+    );
+  })
+});
+
+http.route({
+  path: "/auth/huggingface/callback",
+  method: "GET",
+  handler: httpAction(async () => {
+    return htmlPage(
+      "Hugging Face Connected",
+      "This callback is published for Vibex OAuth metadata. You can close this page and return to the app."
+    );
   })
 });
 
