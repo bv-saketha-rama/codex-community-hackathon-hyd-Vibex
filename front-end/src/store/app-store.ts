@@ -2,17 +2,26 @@ import { create } from "zustand";
 
 import { statusLabel } from "@/lib/job";
 import { clearPersistedState, loadPersistedState, savePersistedState } from "@/lib/storage";
-import type { AppNotification, JobRecord, SessionUser } from "@/types";
+import type {
+  AppNotification,
+  DeviceModelStatus,
+  HfSession,
+  JobRecord,
+  SessionUser
+} from "@/types";
 
 interface PersistedState {
   session?: SessionUser;
   activeProjectId?: string;
+  hfSession?: HfSession;
 }
 
 interface AppState {
   hydrated: boolean;
   isSubmitting: boolean;
   session?: SessionUser;
+  hfSession?: HfSession;
+  deviceModelStatus?: DeviceModelStatus;
   activeProjectId?: string;
   currentJob?: JobRecord;
   currentJobId?: string;
@@ -26,6 +35,8 @@ interface AppState {
   pushNotification: (notification: Omit<AppNotification, "id">) => void;
   dismissNotification: (id: string) => void;
   setSession: (session?: SessionUser) => void;
+  setHfSession: (hfSession?: HfSession) => void;
+  setDeviceModelStatus: (deviceModelStatus?: DeviceModelStatus) => void;
 }
 
 async function persistSnapshot(snapshot: PersistedState) {
@@ -46,7 +57,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         hydrated: true,
         session: snapshot?.session,
-        activeProjectId: snapshot?.activeProjectId
+        activeProjectId: snapshot?.activeProjectId,
+        hfSession: snapshot?.hfSession
       });
     } catch {
       set({
@@ -58,7 +70,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ activeProjectId });
     void persistSnapshot({
       session: get().session,
-      activeProjectId
+      activeProjectId,
+      hfSession: get().hfSession
     });
   },
   setJob(job, jobId) {
@@ -95,6 +108,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLoading(isSubmitting) {
     set({ isSubmitting });
   },
+  setHfSession(hfSession) {
+    set({ hfSession });
+    void persistSnapshot({
+      session: get().session,
+      activeProjectId: get().activeProjectId,
+      hfSession
+    });
+  },
+  setDeviceModelStatus(deviceModelStatus) {
+    set({ deviceModelStatus });
+  },
   pushNotification(notification) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     set((state) => ({
@@ -113,7 +137,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ session });
     void persistSnapshot({
       session,
-      activeProjectId: get().activeProjectId
+      activeProjectId: get().activeProjectId,
+      hfSession: get().hfSession
     });
   }
 }));
@@ -121,6 +146,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 export async function signOut() {
   useAppStore.setState({
     session: undefined,
+    hfSession: undefined,
+    deviceModelStatus: undefined,
     activeProjectId: undefined,
     currentJob: undefined,
     currentJobId: undefined,

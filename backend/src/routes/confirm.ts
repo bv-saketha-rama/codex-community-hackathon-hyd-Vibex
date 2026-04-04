@@ -4,13 +4,17 @@ import { z } from "zod";
 import type { Services } from "@/services";
 import { HttpError, toErrorMessage } from "@/lib/errors";
 
-const specSchema = z.object({
+const patchSchema = z.object({
+  commitMessage: z.string(),
   summary: z.string(),
-  goals: z.array(z.string()).default([]),
-  constraints: z.array(z.string()).default([]),
-  acceptanceCriteria: z.array(z.string()).default([]),
-  targetPaths: z.array(z.string()).default([]),
-  designNotes: z.array(z.string()).default([])
+  files: z.array(
+    z.object({
+      path: z.string(),
+      content: z.string(),
+      operation: z.enum(["upsert", "delete"]),
+      reason: z.string()
+    })
+  )
 });
 
 const confirmSchema = z.object({
@@ -18,12 +22,10 @@ const confirmSchema = z.object({
   projectId: z.string().optional(),
   conversationId: z.string().optional(),
   jobId: z.string().optional(),
-  spec: specSchema,
   repo: z.string(),
   branch: z.string(),
   token: z.string(),
-  openai_api_key: z.string().optional(),
-  image_base64: z.string().optional()
+  patch: patchSchema
 });
 
 export function registerConfirmRoutes(app: Hono, services: Services) {
@@ -47,40 +49,17 @@ export function registerConfirmRoutes(app: Hono, services: Services) {
 
     await services.convex.updateJob({
       jobId,
-      status: "generating",
-      phase: "generate",
-      message: "Preparing repo context for code generation."
+      status: "pushing",
+      phase: "push",
+      message: "Committing the locally generated changes to GitHub."
     });
 
     try {
-      const repoSnapshot = await services.github.fetchRepoSnapshot(body.token, body.repo, body.branch);
-      const skillBundle = await services.skills.composeSkillBundle({
-        userId: body.userId,
-        projectId: body.projectId,
-        repoSnapshot,
-        messages: []
-      });
-
-      const patch = await services.openai.generatePatch({
-        spec: body.spec,
-        repoSnapshot,
-        skillPrompt: skillBundle.prompt,
-        imageBase64: body.image_base64,
-        openaiApiKey: body.openai_api_key
-      });
-
-      if (!patch.files.length) {
+      if (!body.patch.files.length) {
         throw new HttpError(422, "Code generation returned no file changes.");
       }
 
-      await services.convex.updateJob({
-        jobId,
-        status: "pushing",
-        phase: "push",
-        message: "Committing the generated changes to GitHub."
-      });
-
-      const commit = await services.github.commitPatch(body.token, body.repo, body.branch, patch);
+      const commit = await services.github.commitPatch(body.token, body.repo, body.branch, body.patch);
 
       await services.convex.updateJob({
         jobId,

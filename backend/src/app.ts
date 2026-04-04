@@ -14,8 +14,7 @@ import { registerScreenshotRoutes } from "@/routes/screenshot";
 import { registerSkillRoutes } from "@/routes/skills";
 import { createServices } from "@/services";
 
-export function createApp(env: Env = loadEnv()) {
-  const services = createServices(env);
+export function createApp(env: Env = loadEnv(), services = createServices(env)) {
   const app = new Hono();
 
   app.use("*", logger());

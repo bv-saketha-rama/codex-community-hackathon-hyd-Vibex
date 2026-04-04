@@ -11,7 +11,7 @@ export default function IndexRoute() {
   }
 
   if (!activeProjectId) {
-    return <Redirect href={`/onboarding?step=${session.openaiApiKey ? "repo" : "openai"}`} />;
+    return <Redirect href="/onboarding?step=repo" />;
   }
 
   return <Redirect href={`/projects/${activeProjectId}`} />;

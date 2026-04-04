@@ -12,7 +12,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 
 import { ActionButton } from "@/components/action-button";
-import { EngineFactSheet } from "@/components/engine-fact-sheet";
+import { ModelStatusCard } from "@/components/model-status-card";
 import { StudioShell } from "@/components/studio-shell";
 import {
   deleteMcp,
@@ -29,6 +29,13 @@ import {
   updateProject,
   updateSkill
 } from "@/lib/api";
+import {
+  deleteDeviceModel,
+  getDeviceModelStatus,
+  prepareDeviceModel,
+  startDeviceModelDownload
+} from "@/lib/device-model";
+import { signInToHuggingFace } from "@/lib/hf-auth";
 import { isAuthError } from "@/lib/api";
 import { signOut, useAppStore } from "@/store/app-store";
 import { colors, radius, spacing } from "@/theme/tokens";
@@ -37,13 +44,15 @@ import type { MarketplaceSkill, McpServerRecord, ProjectRecord, SkillRecord } fr
 export default function ProjectSettingsScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
   const session = useAppStore((state) => state.session);
-  const setSession = useAppStore((state) => state.setSession);
+  const hfSession = useAppStore((state) => state.hfSession);
+  const setHfSession = useAppStore((state) => state.setHfSession);
+  const deviceModelStatus = useAppStore((state) => state.deviceModelStatus);
+  const setDeviceModelStatus = useAppStore((state) => state.setDeviceModelStatus);
   const pushNotification = useAppStore((state) => state.pushNotification);
   const [project, setProject] = useState<ProjectRecord | null>(null);
   const [skills, setSkills] = useState<SkillRecord[]>([]);
   const [mcps, setMcps] = useState<McpServerRecord[]>([]);
   const [marketplace, setMarketplace] = useState<MarketplaceSkill[]>([]);
-  const [openaiApiKey, setOpenaiApiKey] = useState(session?.openaiApiKey || "");
   const [projectTitle, setProjectTitle] = useState("");
   const [branch, setBranch] = useState("");
   const [draftSkillId, setDraftSkillId] = useState<string | undefined>();
@@ -57,10 +66,6 @@ export default function ProjectSettingsScreen() {
   const [draftMcpInstructions, setDraftMcpInstructions] = useState("");
   const [agentContent, setAgentContent] = useState("");
   const [agentEnabled, setAgentEnabled] = useState(true);
-
-  useEffect(() => {
-    setOpenaiApiKey(session?.openaiApiKey || "");
-  }, [session?.openaiApiKey]);
 
   const relevantSkills = useMemo(
     () =>
@@ -98,6 +103,7 @@ export default function ProjectSettingsScreen() {
       setMcps(mcpResponse.mcps);
       setAgentContent(agentResponse.agentDoc?.content || "");
       setAgentEnabled(agentResponse.agentDoc?.enabled ?? true);
+      setDeviceModelStatus(await getDeviceModelStatus());
     } catch (error) {
       if (isAuthError(error)) {
         void signOut();
@@ -120,22 +126,82 @@ export default function ProjectSettingsScreen() {
     void loadWorkspace();
   }, [projectId, session]);
 
-  async function handleSaveOpenAIKey() {
-    if (!session) {
+  async function handleSignInToHf() {
+    try {
+      const nextSession = await signInToHuggingFace();
+      setHfSession(nextSession);
+      pushNotification({
+        title: "Hugging Face connected",
+        body: "You can now download the gated Android model artifact to this device.",
+        tone: "success"
+      });
+    } catch (error) {
+      Alert.alert(
+        "Unable to connect Hugging Face",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    }
+  }
+
+  async function handleDownloadModel() {
+    if (!hfSession?.accessToken) {
+      Alert.alert("Hugging Face sign-in required", "Connect Hugging Face before downloading the model.");
       return;
     }
 
-    const nextKey = openaiApiKey.trim();
-    setSession({
-      ...session,
-      openaiApiKey: nextKey || undefined
-    });
+    try {
+      setDeviceModelStatus({
+        ...(deviceModelStatus || {
+          modelId: "gemma-4-e4b-it-android",
+          version: "dev-preview",
+          state: "idle",
+          bytesDownloaded: 0,
+          totalBytes: 0,
+          percentage: 0
+        }),
+        state: "downloading"
+      });
+      const status = await startDeviceModelDownload({
+        accessToken: hfSession.accessToken,
+        onProgress: setDeviceModelStatus
+      });
+      setDeviceModelStatus(status);
+      pushNotification({
+        title: "Model ready",
+        body: "The Android on-device runtime is prepared locally.",
+        tone: "success"
+      });
+    } catch (error) {
+      setDeviceModelStatus({
+        ...(deviceModelStatus || {
+          modelId: "gemma-4-e4b-it-android",
+          version: "dev-preview",
+          bytesDownloaded: 0,
+          totalBytes: 0,
+          percentage: 0
+        }),
+        state: "failed",
+        error: error instanceof Error ? error.message : "Model download failed."
+      });
+      Alert.alert(
+        "Unable to download model",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    }
+  }
+
+  async function handlePrepareModel() {
+    const status = await prepareDeviceModel();
+    setDeviceModelStatus(status);
+  }
+
+  async function handleDeleteModel() {
+    const status = await deleteDeviceModel();
+    setDeviceModelStatus(status);
     pushNotification({
-      title: nextKey ? "OpenAI key saved" : "Backend key selected",
-      body: nextKey
-        ? "Vibex will use your key for chat, voice, and code generation."
-        : "Vibex will fall back to the backend OpenAI key.",
-      tone: "success"
+      title: "Local model removed",
+      body: "You can redownload the Android model artifact at any time.",
+      tone: "info"
     });
   }
 
@@ -212,7 +278,7 @@ export default function ProjectSettingsScreen() {
     <StudioShell
       eyebrow="Workspace settings"
       title={project?.title || "Workspace settings"}
-      subtitle="Manage Vibex workspace metadata, engine access, skills, MCP prompt context, and agents instructions."
+      subtitle="Manage workspace metadata, on-device model controls, skills, MCP prompt context, and agents instructions."
       keyboardAware
       headerRight={
         <Pressable onPress={() => router.back()} style={styles.iconButton}>
@@ -221,23 +287,20 @@ export default function ProjectSettingsScreen() {
       }
     >
       <View style={styles.section}>
-        <Text style={styles.label}>Engine access</Text>
-        <EngineFactSheet compact />
-        <TextInput
-          value={openaiApiKey}
-          onChangeText={setOpenaiApiKey}
-          placeholder="OpenAI API key"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          style={styles.input}
-        />
+        <Text style={styles.label}>On-device model</Text>
+        <ModelStatusCard status={deviceModelStatus} hfSession={hfSession} compact />
         <Text style={styles.helperCopy}>
-          Vibex uses this key for chat, voice transcription, and code generation. Leave it blank to
-          use the backend OpenAI key instead.
+          GitHub auth stays in Convex. The Hugging Face token stays only on this device so the gated
+          Android artifact can be downloaded and prepared locally.
         </Text>
-        <ActionButton label="Save OpenAI key" onPress={handleSaveOpenAIKey} secondary />
+        <ActionButton
+          label={hfSession ? "Reconnect Hugging Face" : "Connect Hugging Face"}
+          onPress={() => void handleSignInToHf()}
+          secondary
+        />
+        <ActionButton label="Download Android model" onPress={() => void handleDownloadModel()} secondary />
+        <ActionButton label="Prepare local runtime" onPress={() => void handlePrepareModel()} secondary />
+        <ActionButton label="Delete local model" onPress={() => void handleDeleteModel()} secondary />
       </View>
 
       <View style={styles.section}>

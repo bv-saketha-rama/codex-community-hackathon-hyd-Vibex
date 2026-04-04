@@ -14,7 +14,6 @@ function firstParam(value: string | string[] | undefined) {
 
 export default function AuthCallbackRoute() {
   const params = useLocalSearchParams();
-  const session = useAppStore((state) => state.session);
   const setSession = useAppStore((state) => state.setSession);
 
   useEffect(() => {
@@ -44,14 +43,13 @@ export default function AuthCallbackRoute() {
       }
 
       setSession({
-        openaiApiKey: session?.openaiApiKey,
         userId,
         githubToken,
         login,
         avatarUrl: firstParam(params.avatarUrl) || undefined,
         name: firstParam(params.name) || undefined
       });
-      router.replace("/onboarding?step=openai");
+      router.replace("/onboarding?step=repo");
       return;
     }
 

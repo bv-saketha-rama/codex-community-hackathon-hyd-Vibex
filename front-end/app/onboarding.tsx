@@ -13,7 +13,7 @@ import { ChevronLeft, FolderGit2, Plus } from "lucide-react-native";
 
 import { ActionButton } from "@/components/action-button";
 import { BrandArtwork } from "@/components/brand-artwork";
-import { EngineFactSheet } from "@/components/engine-fact-sheet";
+import { ModelStatusCard } from "@/components/model-status-card";
 import { StudioShell } from "@/components/studio-shell";
 import { connectGitHub } from "@/lib/auth";
 import {
@@ -32,10 +32,10 @@ import type { RepoOwner, RepoSelection } from "@/types";
 const DEFAULT_COMPONENT_RULE =
   "Prefer project-level Button, Card, Input, Modal, and navigation primitives before raw elements.";
 
-type OnboardingStep = "github" | "openai" | "repo" | "workspace";
+type OnboardingStep = "github" | "repo" | "workspace";
 type RepoMode = "existing" | "new";
 
-const stepOrder: OnboardingStep[] = ["github", "openai", "repo", "workspace"];
+const stepOrder: OnboardingStep[] = ["github", "repo", "workspace"];
 
 function stepContent(step: OnboardingStep) {
   switch (step) {
@@ -46,26 +46,18 @@ function stepContent(step: OnboardingStep) {
         subtitle:
           "Open Vibex with your GitHub identity, then pick or create a repo and step into your workspace."
       };
-    case "openai":
-      return {
-        eyebrow: "Step 2",
-        title: "Add your OpenAI key",
-        subtitle:
-          "Use your own key for voice, clarification, and code generation. Leave it blank to fall back to the backend key."
-      };
     case "repo":
       return {
-        eyebrow: "Step 3",
+        eyebrow: "Step 2",
         title: "Choose or create a repo",
         subtitle:
           "Select an existing project or create a private starter repo that Vibex can shape immediately."
       };
     case "workspace":
       return {
-        eyebrow: "Step 4",
+        eyebrow: "Step 3",
         title: "Name your workspace",
-        subtitle:
-          "Keep setup minimal, enter the workspace, and refine deeper rules after the repo is live."
+        subtitle: "Enter the workspace and keep the on-device model runtime visible while you work."
       };
   }
 }
@@ -76,7 +68,7 @@ function stepIndex(step: OnboardingStep) {
 
 function parseStep(value: string | string[] | undefined) {
   const candidate = Array.isArray(value) ? value[0] : value;
-  if (candidate === "openai" || candidate === "repo" || candidate === "workspace") {
+  if (candidate === "repo" || candidate === "workspace") {
     return candidate;
   }
   return "github";
@@ -88,6 +80,8 @@ export default function OnboardingScreen() {
   const setSession = useAppStore((state) => state.setSession);
   const setActiveProjectId = useAppStore((state) => state.setActiveProjectId);
   const pushNotification = useAppStore((state) => state.pushNotification);
+  const hfSession = useAppStore((state) => state.hfSession);
+  const deviceModelStatus = useAppStore((state) => state.deviceModelStatus);
   const [step, setStep] = useState<OnboardingStep>(() => parseStep(params.step));
   const [repoMode, setRepoMode] = useState<RepoMode>("existing");
   const [repos, setRepos] = useState<RepoSelection[]>([]);
@@ -95,7 +89,6 @@ export default function OnboardingScreen() {
   const [selectedOwner, setSelectedOwner] = useState<RepoOwner | undefined>();
   const [selectedRepo, setSelectedRepo] = useState<RepoSelection | undefined>();
   const [existingProjectCount, setExistingProjectCount] = useState(0);
-  const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [branch, setBranch] = useState("main");
   const [newRepoName, setNewRepoName] = useState("");
@@ -105,11 +98,6 @@ export default function OnboardingScreen() {
   const [connecting, setConnecting] = useState(false);
   const [creatingRepo, setCreatingRepo] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savingOpenAIKey, setSavingOpenAIKey] = useState(false);
-
-  useEffect(() => {
-    setOpenaiApiKey(session?.openaiApiKey || "");
-  }, [session?.openaiApiKey]);
 
   useEffect(() => {
     if (!session?.githubToken) {
@@ -181,10 +169,7 @@ export default function OnboardingScreen() {
     try {
       const nextSession = await connectGitHub();
       if (nextSession) {
-        setSession({
-          ...nextSession,
-          openaiApiKey: session?.openaiApiKey || nextSession.openaiApiKey
-        });
+        setSession(nextSession);
         setSelectedOwner({
           login: nextSession.login,
           type: "user",
@@ -192,41 +177,15 @@ export default function OnboardingScreen() {
         });
         pushNotification({
           title: "GitHub connected",
-          body: "Now add your OpenAI key or keep the backend default.",
+          body: "Pick a repo and then bring the on-device model online from the workspace settings.",
           tone: "success"
         });
-        setStep("openai");
+        setStep("repo");
       }
     } catch (error) {
       Alert.alert("GitHub connection failed", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setConnecting(false);
-    }
-  }
-
-  async function handleSaveOpenAIKey(skip = false) {
-    if (!session) {
-      return;
-    }
-
-    setSavingOpenAIKey(true);
-    try {
-      const trimmedKey = skip ? "" : openaiApiKey.trim();
-      const nextSession = {
-        ...session,
-        openaiApiKey: trimmedKey || undefined
-      };
-      setSession(nextSession);
-      pushNotification({
-        title: trimmedKey ? "OpenAI key saved" : "Using backend OpenAI key",
-        body: trimmedKey
-          ? "Vibex will use your key for chat, voice, and code generation."
-          : "You can add a key later in workspace settings.",
-        tone: "info"
-      });
-      setStep("repo");
-    } finally {
-      setSavingOpenAIKey(false);
     }
   }
 
@@ -351,39 +310,6 @@ export default function OnboardingScreen() {
           label={connecting ? "Connecting GitHub..." : "Continue with GitHub"}
           onPress={handleGitHubConnect}
           icon={<FolderGit2 color="#091018" size={18} />}
-        />
-      </View>
-    );
-  }
-
-  function renderOpenAIStep() {
-    return (
-      <View>
-        <EngineFactSheet />
-        <Text style={styles.bodyCopy}>
-          Vibex uses your key only for backend model calls. It never changes the GitHub auth
-          flow, and you can update or clear it later from workspace settings.
-        </Text>
-        <TextInput
-          value={openaiApiKey}
-          onChangeText={setOpenaiApiKey}
-          placeholder="sk-proj-..."
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          style={styles.input}
-        />
-        <ActionButton
-          label={savingOpenAIKey ? "Saving key..." : "Save OpenAI key and continue"}
-          onPress={() => void handleSaveOpenAIKey()}
-          disabled={savingOpenAIKey}
-        />
-        <ActionButton
-          label={savingOpenAIKey ? "Please wait..." : "Use backend key instead"}
-          onPress={() => void handleSaveOpenAIKey(true)}
-          secondary
-          disabled={savingOpenAIKey}
         />
       </View>
     );
@@ -527,12 +453,12 @@ export default function OnboardingScreen() {
         <View style={styles.headerCard}>
           <Text style={styles.headerCardTitle}>{selectedRepo?.fullName || "Workspace ready"}</Text>
           <Text style={styles.headerCardCopy}>
-            Vibex will seed a default component rule automatically. Voice requests become
-            transcripts before the model sees them, image and URL inputs become visual references,
-            and confirmation turns the spec into a GitHub commit. You can add deeper skills, MCP
-            context, and agents instructions after you enter the workspace.
+            Vibex will seed a default component rule automatically and keep the Android on-device
+            engine visible while you work. Sign in to Hugging Face and download the gated model
+            from workspace settings, then route requests through local generation before GitHub push.
           </Text>
         </View>
+        <ModelStatusCard status={deviceModelStatus} hfSession={hfSession} compact />
         <TextInput
           value={projectTitle}
           onChangeText={setProjectTitle}
@@ -586,7 +512,6 @@ export default function OnboardingScreen() {
         />
       ) : null}
       {step === "github" ? renderGitHubStep() : null}
-      {step === "openai" ? renderOpenAIStep() : null}
       {step === "repo" ? renderRepoStep() : null}
       {step === "workspace" ? renderWorkspaceStep() : null}
     </StudioShell>
