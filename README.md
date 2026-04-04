@@ -153,3 +153,5 @@ This project is a hackathon-grade prototype of a mobile Codex experience:
 - transparent about what the backend is doing
 - good enough to ship a real repo change from a phone
 
+### Project was created as part of Codex Community Hackathon held in Hyderabad on 4th April, 2026. 
+
