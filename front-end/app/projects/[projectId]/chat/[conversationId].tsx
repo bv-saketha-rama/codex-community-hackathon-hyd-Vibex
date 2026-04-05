@@ -32,8 +32,7 @@ import {
 } from "@/lib/api";
 import {
   generateOnDeviceConversation,
-  generateOnDevicePatch,
-  transcribeOnDeviceAudio
+  generateOnDevicePatch
 } from "@/lib/device-model";
 import { api } from "@/lib/convex-api";
 import { pickImageBase64, readUrlFromClipboard, startRecording, stopRecording } from "@/lib/media";
@@ -190,9 +189,11 @@ export default function ConversationScreen() {
       const screenshotBase64 = urlAttachment
         ? (await captureReferenceUrl(urlAttachment.value)).image_base64
         : options?.imageBase64 || imageAttachment?.value;
-      const effectiveInput = options?.audioBase64
-        ? await transcribeOnDeviceAudio(options.audioBase64)
-        : nextInput || "Voice request";
+      const effectiveInput =
+        nextInput ||
+        (options?.audioBase64
+          ? "Interpret the attached audio request and help with the repo change."
+          : "Voice request");
 
       if (screenshotBase64) {
         setLatestReferenceImage(screenshotBase64);
@@ -212,12 +213,14 @@ export default function ConversationScreen() {
         messages: conversation.messages,
         followUpCount,
         repoSnapshot: repoContext.repoSnapshot,
-        skillPrompt: repoContext.skillPrompt
+        skillPrompt: repoContext.skillPrompt,
+        imageBase64s: screenshotBase64 ? [screenshotBase64] : [],
+        audioBase64s: options?.audioBase64 ? [options.audioBase64] : []
       });
 
       const userMessage = {
         role: "user" as const,
-        content: effectiveInput,
+        content: options?.audioBase64 ? "Voice request" : effectiveInput,
         inputType,
         attachments,
         createdAt: new Date().toISOString()

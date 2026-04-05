@@ -12,7 +12,24 @@ android {
     versionCode 1
     versionName "0.7.10"
   }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_21
+    targetCompatibility JavaVersion.VERSION_21
+  }
+  kotlinOptions {
+    freeCompilerArgs += ["-Xskip-metadata-version-check"]
+  }
   lintOptions {
     abortOnError false
+  }
+}
+
+dependencies {
+  implementation "com.google.ai.edge.litertlm:litertlm-android:0.10.0"
+}
+
+tasks.withType(JavaCompile).configureEach {
+  javaCompiler = javaToolchains.compilerFor {
+    languageVersion = JavaLanguageVersion.of(21)
   }
 }

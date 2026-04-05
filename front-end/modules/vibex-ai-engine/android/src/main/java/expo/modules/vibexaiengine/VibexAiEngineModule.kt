@@ -8,6 +8,11 @@ class VibexAiEngineModule : Module() {
   private var currentModelId = ""
   private var currentVersion = ""
   private var currentLocalUri: String? = null
+  private val runtime = VibexAiEngineRuntime()
+
+  private fun closeEngine() {
+    runtime.closeModel()
+  }
 
   private fun currentStatus(
     state: String = if (currentLocalUri != null) "ready" else "idle",
@@ -39,6 +44,7 @@ class VibexAiEngineModule : Module() {
     }
 
     AsyncFunction("prepareModelAsync") { localUri: String, modelId: String, version: String ->
+      closeEngine()
       currentModelId = modelId
       currentVersion = version
 
@@ -49,10 +55,40 @@ class VibexAiEngineModule : Module() {
         return@AsyncFunction errorStatus
       }
 
+      try {
+        runtime.prepareModel(modelFile.absolutePath, appContext.reactContext?.cacheDir?.absolutePath)
+      } catch (error: Exception) {
+        currentLocalUri = null
+        val errorStatus =
+          currentStatus(state = "failed", error = error.message ?: "Unable to initialize Gemma.")
+        sendEvent("onModelStateChanged", errorStatus)
+        return@AsyncFunction errorStatus
+      }
+
       currentLocalUri = localUri
       val readyStatus = currentStatus()
       sendEvent("onModelStateChanged", readyStatus)
       readyStatus
+    }
+
+    AsyncFunction("closeModelAsync") {
+      closeEngine()
+      currentModelId = ""
+      currentVersion = ""
+      currentLocalUri = null
+      val status = currentStatus(state = "idle")
+      sendEvent("onModelStateChanged", status)
+      status
+    }
+
+    AsyncFunction("generateTextAsync") {
+        prompt: String,
+        systemInstruction: String?,
+        imageBase64s: List<String>,
+        audioBase64s: List<String> ->
+      mapOf(
+        "text" to runtime.generateText(prompt, systemInstruction, imageBase64s, audioBase64s)
+      )
     }
   }
 }

@@ -1,6 +1,10 @@
 import { registerWebModule, NativeModule } from "expo";
 
-import type { VibexAiEngineModuleEvents, VibexAiEngineStatus } from "./VibexAiEngine.types";
+import type {
+  VibexAiEngineGenerateResult,
+  VibexAiEngineModuleEvents,
+  VibexAiEngineStatus
+} from "./VibexAiEngine.types";
 
 class VibexAiEngineModule extends NativeModule<VibexAiEngineModuleEvents> {
   async getStatusAsync(): Promise<VibexAiEngineStatus | null> {
@@ -21,6 +25,21 @@ class VibexAiEngineModule extends NativeModule<VibexAiEngineModuleEvents> {
       percentage: 100,
       localUri
     };
+  }
+
+  async closeModelAsync(): Promise<VibexAiEngineStatus> {
+    return {
+      modelId: "",
+      version: "",
+      state: "idle",
+      bytesDownloaded: 0,
+      totalBytes: 0,
+      percentage: 0
+    };
+  }
+
+  async generateTextAsync(): Promise<VibexAiEngineGenerateResult> {
+    throw new Error("On-device Gemma is only available in the Android development build.");
   }
 }
 

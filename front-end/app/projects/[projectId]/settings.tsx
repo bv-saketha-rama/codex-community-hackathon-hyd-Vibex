@@ -36,6 +36,7 @@ import {
   startDeviceModelDownload
 } from "@/lib/device-model";
 import { signInToHuggingFace } from "@/lib/hf-auth";
+import { getDeviceModelManifest } from "@/lib/model-manifest";
 import { isAuthError } from "@/lib/api";
 import { signOut, useAppStore } from "@/store/app-store";
 import { colors, radius, spacing } from "@/theme/tokens";
@@ -49,6 +50,7 @@ export default function ProjectSettingsScreen() {
   const deviceModelStatus = useAppStore((state) => state.deviceModelStatus);
   const setDeviceModelStatus = useAppStore((state) => state.setDeviceModelStatus);
   const pushNotification = useAppStore((state) => state.pushNotification);
+  const modelManifest = getDeviceModelManifest();
   const [project, setProject] = useState<ProjectRecord | null>(null);
   const [skills, setSkills] = useState<SkillRecord[]>([]);
   const [mcps, setMcps] = useState<McpServerRecord[]>([]);
@@ -144,7 +146,7 @@ export default function ProjectSettingsScreen() {
   }
 
   async function handleDownloadModel() {
-    if (!hfSession?.accessToken) {
+    if (modelManifest.requiresAuth && !hfSession?.accessToken) {
       Alert.alert("Hugging Face sign-in required", "Connect Hugging Face before downloading the model.");
       return;
     }
@@ -162,7 +164,7 @@ export default function ProjectSettingsScreen() {
         state: "downloading"
       });
       const status = await startDeviceModelDownload({
-        accessToken: hfSession.accessToken,
+        accessToken: hfSession?.accessToken,
         onProgress: setDeviceModelStatus
       });
       setDeviceModelStatus(status);
@@ -290,14 +292,17 @@ export default function ProjectSettingsScreen() {
         <Text style={styles.label}>On-device model</Text>
         <ModelStatusCard status={deviceModelStatus} hfSession={hfSession} compact />
         <Text style={styles.helperCopy}>
-          GitHub auth stays in Convex. The Hugging Face token stays only on this device so the gated
-          Android artifact can be downloaded and prepared locally.
+          {modelManifest.requiresAuth
+            ? "GitHub auth stays in Convex. The Hugging Face token stays only on this device so the Android artifact can be downloaded and prepared locally."
+            : "GitHub auth stays in Convex. The default Gemma 4 LiteRT model downloads directly from the public LiteRT community build and prepares locally on this device."}
         </Text>
-        <ActionButton
-          label={hfSession ? "Reconnect Hugging Face" : "Connect Hugging Face"}
-          onPress={() => void handleSignInToHf()}
-          secondary
-        />
+        {modelManifest.requiresAuth ? (
+          <ActionButton
+            label={hfSession ? "Reconnect Hugging Face" : "Connect Hugging Face"}
+            onPress={() => void handleSignInToHf()}
+            secondary
+          />
+        ) : null}
         <ActionButton label="Download Android model" onPress={() => void handleDownloadModel()} secondary />
         <ActionButton label="Prepare local runtime" onPress={() => void handlePrepareModel()} secondary />
         <ActionButton label="Delete local model" onPress={() => void handleDeleteModel()} secondary />

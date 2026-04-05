@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "vibex",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/codex-cli-splash.png",
       "resizeMode": "contain",
@@ -22,11 +22,22 @@
         "backgroundColor": "#04070C"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.saketha.rama.vibex"
     },
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 31,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
       "expo-secure-store",
       "expo-font",
       "expo-web-browser"

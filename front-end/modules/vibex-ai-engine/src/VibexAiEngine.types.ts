@@ -24,6 +24,10 @@ export type VibexAiEngineStatus = {
   error?: string;
 };
 
+export type VibexAiEngineGenerateResult = {
+  text: string;
+};
+
 export type VibexAiEngineViewProps = {
   url: string;
   onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;

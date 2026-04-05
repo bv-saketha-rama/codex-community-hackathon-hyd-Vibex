@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { getDeviceModelManifest } from "@/lib/model-manifest";
 import { colors, radius, spacing } from "@/theme/tokens";
 import type { DeviceModelStatus, HfSession } from "@/types";
 
@@ -17,6 +18,7 @@ export function ModelStatusCard(props: {
   compact?: boolean;
 }) {
   const status = props.status;
+  const manifest = getDeviceModelManifest();
   const subtitle =
     status?.state === "downloading"
       ? `${status.percentage}% downloaded • ${formatBytes(status.bytesDownloaded)} / ${formatBytes(status.totalBytes)}`
@@ -24,7 +26,9 @@ export function ModelStatusCard(props: {
         ? `Model ${status.version} is available locally on this device.`
         : status?.state === "failed"
           ? status.error || "Model preparation failed."
-          : "Sign in to Hugging Face to unlock the gated on-device model download.";
+          : manifest.requiresAuth
+            ? "Sign in to Hugging Face to unlock the gated on-device model download."
+            : "Download the on-device Gemma runtime directly to this device.";
 
   return (
     <View style={[styles.container, props.compact ? styles.compactContainer : undefined]}>
@@ -32,9 +36,11 @@ export function ModelStatusCard(props: {
       <Text style={styles.title}>Android Gemma runtime</Text>
       <Text style={styles.value}>{subtitle}</Text>
       <Text style={styles.meta}>
-        {props.hfSession?.handle
-          ? `Hugging Face: ${props.hfSession.handle}`
-          : "Hugging Face: not connected"}
+        {manifest.requiresAuth
+          ? props.hfSession?.handle
+            ? `Hugging Face: ${props.hfSession.handle}`
+            : "Hugging Face: not connected"
+          : "Source: LiteRT community public model"}
       </Text>
     </View>
   );

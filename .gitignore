@@ -7,12 +7,14 @@ coverage
 dist
 node_modules
 pnpm-debug.log
+.tmp
 
 # Expo
 front-end/.expo
 front-end/.expo-shared
 front-end/dist
 front-end/web-build
+front-end/modules/vibex-ai-engine/android/build
 
 # Native
 front-end/android

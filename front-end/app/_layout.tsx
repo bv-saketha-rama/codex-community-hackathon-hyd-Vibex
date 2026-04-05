@@ -14,6 +14,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LoadingScreen } from "@/components/loading-screen";
 import { NotificationStack } from "@/components/notification-stack";
 import { getDeviceModelStatus, startDeviceModelDownload } from "@/lib/device-model";
+import { getDeviceModelManifest } from "@/lib/model-manifest";
 import { useAppStore } from "@/store/app-store";
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -56,13 +57,17 @@ export default function RootLayout() {
     }
 
     void (async () => {
+      const manifest = getDeviceModelManifest();
       const status = await getDeviceModelStatus();
       setDeviceModelStatus(status);
 
-      if (hfSession?.accessToken && status.state === "idle") {
+      const canDownload =
+        !!manifest.sourceUrl && (!manifest.requiresAuth || !!hfSession?.accessToken);
+
+      if (canDownload && status.state === "idle") {
         try {
           const prepared = await startDeviceModelDownload({
-            accessToken: hfSession.accessToken,
+            accessToken: hfSession?.accessToken,
             onProgress: setDeviceModelStatus
           });
           setDeviceModelStatus(prepared);
